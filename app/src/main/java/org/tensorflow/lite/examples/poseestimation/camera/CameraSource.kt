@@ -110,7 +110,9 @@ class CameraSource(
                 yuvConverter.yuvToRgb(image, imageBitmap)
                 // Create rotated version for portrait display
                 val rotateMatrix = Matrix()
-                rotateMatrix.postRotate(90.0f)
+                rotateMatrix.postRotate(-90.0f) //90.0f if we are facing front
+                // Mirror the image
+                rotateMatrix.postScale(-1f, 1f, PREVIEW_WIDTH / 2f, PREVIEW_HEIGHT / 2f)
 
                 val rotatedBitmap = Bitmap.createBitmap(
                     imageBitmap, 0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT,
@@ -167,15 +169,20 @@ class CameraSource(
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
 
             // We don't use a front facing camera in this sample.
+
             val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)//
             if (cameraDirection != null &&
-                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
+                cameraDirection == CameraCharacteristics.LENS_FACING_BACK     //LENS_FACING_FRONT
             ) {
                 continue
             }
             this.cameraId = cameraId
+
+
+            break
         }
     }
+
 
     fun setDetector(detector: PoseDetector) {
         synchronized(lock) {
