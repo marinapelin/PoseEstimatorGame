@@ -21,25 +21,36 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.graphics.Rect
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.TotalCaptureResult
+
 import android.media.ImageReader
+import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceView
+import android.widget.Toast
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
+import org.tensorflow.lite.examples.poseestimation.data.BodyPart
+import org.tensorflow.lite.examples.poseestimation.data.KeyPoint
+import org.tensorflow.lite.examples.poseestimation.data.KeyPointComparer
 import org.tensorflow.lite.examples.poseestimation.data.Person
 import org.tensorflow.lite.examples.poseestimation.ml.MoveNetMultiPose
 import org.tensorflow.lite.examples.poseestimation.ml.PoseClassifier
 import org.tensorflow.lite.examples.poseestimation.ml.PoseDetector
 import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
+import java.io.File
+import java.io.FileOutputStream
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -48,6 +59,7 @@ class CameraSource(
     private val surfaceView: SurfaceView,
     private val listener: CameraSourceListener? = null
 ) {
+
 
     companion object {
         private const val PREVIEW_WIDTH = 640
@@ -58,12 +70,38 @@ class CameraSource(
         private const val TAG = "Camera Source"
     }
 
+    private var thePersons: List<Person> = listOf(
+        Person(
+            id = -1,
+            keyPoints = listOf(
+                KeyPoint(bodyPart = BodyPart.NOSE, coordinate = PointF(262.3125f, 262.5078f), score = 0.61399585f),
+                KeyPoint(bodyPart = BodyPart.LEFT_EYE, coordinate = PointF(294.6723f, 233.80849f), score = 0.47138926f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_EYE, coordinate = PointF(252.67532f, 237.27197f), score = 0.5418733f),
+                KeyPoint(bodyPart = BodyPart.LEFT_EAR, coordinate = PointF(373.3912f, 254.24982f), score = 0.48233688f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_EAR, coordinate = PointF(255.02353f, 251.37383f), score = 0.24887112f),
+                KeyPoint(bodyPart = BodyPart.LEFT_SHOULDER, coordinate = PointF(428.4883f, 425.24216f), score = 0.62777394f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_SHOULDER, coordinate = PointF(220.79736f, 387.03735f), score = 0.7529446f),
+                KeyPoint(bodyPart = BodyPart.LEFT_ELBOW, coordinate = PointF(416.0971f, 625.88104f), score = 0.31619754f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_ELBOW, coordinate = PointF(124.45984f, 512.50476f), score = 0.4252016f),
+                KeyPoint(bodyPart = BodyPart.LEFT_WRIST, coordinate = PointF(287.91705f, 606.51953f), score = 0.09692693f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_WRIST, coordinate = PointF(107.27205f, 626.70416f), score = 0.26168692f),
+                KeyPoint(bodyPart = BodyPart.LEFT_HIP, coordinate = PointF(324.33444f, 638.16925f), score = 0.2071212f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_HIP, coordinate = PointF(201.19821f, 638.6145f), score = 0.26187536f),
+                KeyPoint(bodyPart = BodyPart.LEFT_KNEE, coordinate = PointF(384.43634f, 641.734f), score = 0.034328014f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_KNEE, coordinate = PointF(70.66431f, 642.3127f), score = 0.04376632f),
+                KeyPoint(bodyPart = BodyPart.LEFT_ANKLE, coordinate = PointF(206.36691f, 637.9958f), score = 0.037734658f),
+                KeyPoint(bodyPart = BodyPart.RIGHT_ANKLE, coordinate = PointF(76.84413f, 635.8355f), score = 0.03425151f)
+            ),
+            boundingBox = null,
+            score = 0.321075f
+        )
+    )
     private val lock = Any()
     private var detector: PoseDetector? = null
     private var classifier: PoseClassifier? = null
     private var isTrackerEnabled = false
     private var yuvConverter: YuvToRgbConverter = YuvToRgbConverter(surfaceView.context)
-    private lateinit var imageBitmap: Bitmap
+    public lateinit var imageBitmap: Bitmap
 
     /** Frame count that have been processed so far in an one second interval to calculate FPS. */
     private var fpsTimer: Timer? = null
@@ -134,6 +172,8 @@ class CameraSource(
                 session?.setRepeatingRequest(it, null, null)
             }
         }
+        // Take photo after 1 seconds delay
+        //takePhotoAfterDelay(1000)
     }
 
     private suspend fun createSession(targets: List<Surface>): CameraCaptureSession =
@@ -282,6 +322,18 @@ class CameraSource(
             bitmap,
             persons.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
         )
+        val threshold = 50.0f // Adjust this threshold as needed
+        val comparer = KeyPointComparer()
+        val result = comparer.areListPersonsSimilar(thePersons, persons, threshold)
+        //Toast.makeText(surfaceView.context, "Result: $result", Toast.LENGTH_LONG).show()
+
+        //println("Are persons similar: $result")
+         if(result==true){
+             Toast.makeText(surfaceView.context, "Result: $result", Toast.LENGTH_LONG).show()
+             //takePhotoAfterDelay(10)
+             saveImage(bitmap)
+         }
+
 
         val holder = surfaceView.holder
         val surfaceCanvas = holder.lockCanvas()
@@ -328,7 +380,78 @@ class CameraSource(
 
     interface CameraSourceListener {
         fun onFPSListener(fps: Int)
-
+        //fun onPreviewFrame(bitmap: Bitmap)
         fun onDetectedInfo(personScore: Float?, poseLabels: List<Pair<String, Float>>?)
     }
+    //new
+    private fun capturePhoto() {
+        val captureRequest = camera?.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+        imageReader?.surface?.let {
+            captureRequest?.addTarget(it)
+            captureRequest?.build()?.let { it1 ->
+                session?.capture(it1, object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(
+                        session: CameraCaptureSession,
+                        request: CaptureRequest,
+                        result: TotalCaptureResult
+                    ) {
+                        super.onCaptureCompleted(session, request, result)
+                        Toast.makeText(surfaceView.context, "Photo captured", Toast.LENGTH_SHORT).show()
+                        saveImage(imageBitmap)//i think
+                    }
+                }, imageReaderHandler)
+            }
+        }
+    }
+    fun saveImage(imageBitmap: Bitmap) {
+        val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString()
+        val myDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "AppPictures")
+        myDir.mkdirs()
+        val fileName = "Image_${System.currentTimeMillis()}.jpg"
+        val file = File(myDir, fileName)
+        if (file.exists()) file.delete()
+        try {
+            val out = FileOutputStream(file)
+            imageBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            out.flush()
+            out.close()
+            Toast.makeText(surfaceView.context, "Saved: $file", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(surfaceView.context, "Error saving image", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+//    private fun saveImage()  {
+//        val image = imageReader?.acquireLatestImage() ?: return
+//
+//        // Convert image to bitmap or save to file
+//        val buffer = image.planes[0].buffer
+//        val bytes = ByteArray(buffer.remaining())
+//        buffer.get(bytes)
+//
+//        // Specify the directory and file name
+//        val picturesDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "AppPictures")
+//        if (!picturesDir.exists()) {
+//            picturesDir.mkdirs() // Create the directory if it doesn't exist
+//        }
+//        val outputFile = File(picturesDir, "photo_${System.currentTimeMillis()}.jpg")
+//
+//        // Save the image to the specified directory
+//        FileOutputStream(outputFile).use { it.write(bytes) }
+//
+//        // Notify user
+//        Toast.makeText(surfaceView.context, "Photo captured: ${outputFile.absolutePath}", Toast.LENGTH_LONG).show()
+//
+//        image.close()
+//    }
+
+    private fun takePhotoAfterDelay(delayMillis: Long) {
+        imageReaderHandler?.postDelayed({
+            capturePhoto()
+        }, delayMillis)
+    }
+
+    //end new
+
 }

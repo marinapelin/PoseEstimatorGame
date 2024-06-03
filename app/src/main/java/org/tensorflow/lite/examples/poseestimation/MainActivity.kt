@@ -19,9 +19,12 @@ package org.tensorflow.lite.examples.poseestimation
 import android.Manifest
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.ContentValues.TAG
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Process
+import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
@@ -29,6 +32,7 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
@@ -41,8 +45,9 @@ import org.tensorflow.lite.examples.poseestimation.ml.*
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val FRAGMENT_DIALOG = "dialog"
+    //new
+        private const val REQUEST_CAMERA_PERMISSION = 100
     }
-
     /** A [SurfaceView] for camera preview.   */
     private lateinit var surfaceView: SurfaceView
 
@@ -57,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     /** Default device is CPU */
     private var device = Device.CPU
 
+    //private var previewBitmap: Bitmap? = null//new
     private lateinit var tvScore: TextView
     private lateinit var tvFPS: TextView
     private lateinit var spnDevice: Spinner
@@ -147,11 +153,17 @@ class MainActivity : AppCompatActivity() {
         tvClassificationValue3 = findViewById(R.id.tvClassificationValue3)
         swClassification = findViewById(R.id.swPoseClassification)
         vClassificationOption = findViewById(R.id.vClassificationOption)
+
         initSpinner()
         spnModel.setSelection(modelPos)
         swClassification.setOnCheckedChangeListener(setClassificationListener)
         if (!isCameraPermissionGranted()) {
             requestPermission()
+        }
+    }
+    private fun allPermissionsGranted(): Boolean {
+        return arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE).all {
+            ActivityCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -209,12 +221,26 @@ class MainActivity : AppCompatActivity() {
                                     convertPoseLabels(if (it.size >= 3) it[2] else null)
                                 )
                             }
-                        }
+                        }//new
+//                        override fun onPreviewFrame(bitmap: Bitmap) {
+//                            Log.d(TAG, "Preview frame received")
+//                            previewBitmap = bitmap
+//                        }
 
                     }).apply {
                         prepareCamera()
                     }
-                isPoseClassifier()
+
+                if (allPermissionsGranted()) {
+                    //startCamera()
+                } else {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        REQUEST_CAMERA_PERMISSION
+                    )
+                }
+                //isPoseClassifier()//not needed me
                 lifecycleScope.launch(Dispatchers.Main) {
                     cameraSource?.initCamera()
                 }
