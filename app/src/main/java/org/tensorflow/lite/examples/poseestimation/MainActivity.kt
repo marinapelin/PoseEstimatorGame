@@ -1,4 +1,4 @@
-/* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2021 The Te nsorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,14 +17,13 @@ limitations under the License.
 package org.tensorflow.lite.examples.poseestimation
 
 import android.Manifest
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
-import android.content.ContentValues.TAG
+import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
 import android.os.Bundle
 import android.os.Process
-import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
@@ -40,7 +39,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 import org.tensorflow.lite.examples.poseestimation.data.Device
+import org.tensorflow.lite.examples.poseestimation.data.ShowResult
 import org.tensorflow.lite.examples.poseestimation.ml.*
+
+
+//import kotlin.coroutines.jvm.internal.CompletedContinuation.context
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -75,6 +78,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swClassification: SwitchCompat
     private lateinit var vClassificationOption: View
     private var cameraSource: CameraSource? = null
+    private var showResult: ShowResult? = null
     private var isClassifyPose = false
     private val requestPermissionLauncher =
         registerForActivityResult(
@@ -160,6 +164,12 @@ class MainActivity : AppCompatActivity() {
         if (!isCameraPermissionGranted()) {
             requestPermission()
         }
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            val intent = Intent(this@MainActivity, ShowResult::class.java)
+            startActivity(intent)
+        }
+
     }
     private fun allPermissionsGranted(): Boolean {
         return arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE).all {
@@ -222,14 +232,45 @@ class MainActivity : AppCompatActivity() {
                                 )
                             }
                         }//new
-//                        override fun onPreviewFrame(bitmap: Bitmap) {
-//                            Log.d(TAG, "Preview frame received")
-//                            previewBitmap = bitmap
-//                        }
+                        override fun onClose(boolean: Boolean) {
+                            if (showResult == null) {
+                                (this as Activity).runOnUiThread {
+                                    val intent: Intent = Intent(this, ShowResult::class.java)
+                                    // Set any extras or flags if needed
+                                    //intent.putExtra("imagename", fileName)
+                                    //intent.putExtra("url", url)
+                                    this.startActivity(intent)
+                                }
+                                //showResult = ShowResult()
+
+
+                                //isPoseClassifier()//not needed me
+//                                lifecycleScope.launch(Dispatchers.Main) {
+//                                    showResult?.initCamera()
+//                                }
+                            }
+
+                        }
+
+
+                            //Log.d(TAG, "Preview frame received")
+                            //previewBitmap = bitmap
+                        //}
 
                     }).apply {
                         prepareCamera()
                     }
+//                cameraSource!!.setEndGameListener(object : CameraSource.EndGameListener {
+//                        override fun onEndGame() {
+//                            // Handle the EndGame state change
+//                            Log.d(TAG, "EndGame is true, handling state change in MainActivity")
+//                            showToast("END")
+//                            //sendBroadcast(intermediation);
+//
+
+//
+//                        }
+//                })
 
                 if (allPermissionsGranted()) {
                     //startCamera()

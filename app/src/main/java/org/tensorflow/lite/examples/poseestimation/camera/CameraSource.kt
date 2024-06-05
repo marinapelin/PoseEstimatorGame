@@ -56,11 +56,24 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class CameraSource(
+    //private val callback: EndGameListener,
     private val surfaceView: SurfaceView,
     private val listener: CameraSourceListener? = null
 ) {
+    var test: List<Pair<String, Float>>? =null
+        public var EndGame: Boolean = false
+        private set
+//    interface EndGameListener {
+//
+//        fun OnEndGame()
+//    }
 
 
+//    private var endGameListener: EndGameListener? = null
+//
+//    fun setEndGameListener(listener: EndGameListener) {
+//        endGameListener = listener
+//    }
     companion object {
         private const val PREVIEW_WIDTH = 640
         private const val PREVIEW_HEIGHT = 480
@@ -96,6 +109,7 @@ class CameraSource(
             score = 0.321075f
         )
     )
+
     private val lock = Any()
     private var detector: PoseDetector? = null
     private var classifier: PoseClassifier? = null
@@ -299,6 +313,7 @@ class CameraSource(
                 if (persons.isNotEmpty()) {
                     classifier?.run {
                         classificationResult = classify(persons[0])
+                        test =classificationResult
                     }
                 }
             }
@@ -380,8 +395,8 @@ class CameraSource(
 
     interface CameraSourceListener {
         fun onFPSListener(fps: Int)
-        //fun onPreviewFrame(bitmap: Bitmap)
         fun onDetectedInfo(personScore: Float?, poseLabels: List<Pair<String, Float>>?)
+        fun onClose(boolean: Boolean)
     }
     //new
     private fun capturePhoto() {
@@ -416,35 +431,21 @@ class CameraSource(
             out.flush()
             out.close()
             Toast.makeText(surfaceView.context, "Saved: $file", Toast.LENGTH_LONG).show()
+            EndGame = true;
+            //callback.onCameraReady()
+            //stopImageReaderThread()
+
         } catch (e: Exception) {
             e.printStackTrace()
             Toast.makeText(surfaceView.context, "Error saving image", Toast.LENGTH_SHORT).show()
         }
+       // close()
+
+        //listener?.onDetectedInfo(21123.2f, test)
+        //listener?.onClose(true)
+        //onClose()
 
     }
-//    private fun saveImage()  {
-//        val image = imageReader?.acquireLatestImage() ?: return
-//
-//        // Convert image to bitmap or save to file
-//        val buffer = image.planes[0].buffer
-//        val bytes = ByteArray(buffer.remaining())
-//        buffer.get(bytes)
-//
-//        // Specify the directory and file name
-//        val picturesDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "AppPictures")
-//        if (!picturesDir.exists()) {
-//            picturesDir.mkdirs() // Create the directory if it doesn't exist
-//        }
-//        val outputFile = File(picturesDir, "photo_${System.currentTimeMillis()}.jpg")
-//
-//        // Save the image to the specified directory
-//        FileOutputStream(outputFile).use { it.write(bytes) }
-//
-//        // Notify user
-//        Toast.makeText(surfaceView.context, "Photo captured: ${outputFile.absolutePath}", Toast.LENGTH_LONG).show()
-//
-//        image.close()
-//    }
 
     private fun takePhotoAfterDelay(delayMillis: Long) {
         imageReaderHandler?.postDelayed({
