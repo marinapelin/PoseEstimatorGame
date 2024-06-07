@@ -19,6 +19,7 @@ package org.tensorflow.lite.examples.poseestimation.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.PointF
@@ -29,7 +30,6 @@ import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.TotalCaptureResult
-
 import android.media.ImageReader
 import android.os.Environment
 import android.os.Handler
@@ -38,6 +38,8 @@ import android.util.Log
 import android.view.Surface
 import android.view.SurfaceView
 import android.widget.Toast
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.SimpleTarget
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
@@ -49,14 +51,16 @@ import org.tensorflow.lite.examples.poseestimation.ml.MoveNetMultiPose
 import org.tensorflow.lite.examples.poseestimation.ml.PoseClassifier
 import org.tensorflow.lite.examples.poseestimation.ml.PoseDetector
 import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class CameraSource(
-    //private val callback: EndGameListener,
+    private val url: String ="https://content1.getnarrativeapp.com/static/8542a067-76df-49d2-b3c6-b347d6da1b85/Sam_0205.jpg?w=750",
     private val surfaceView: SurfaceView,
     private val listener: CameraSourceListener? = null
 ) {
@@ -67,6 +71,31 @@ class CameraSource(
 //
 //        fun OnEndGame()
 //    }
+
+    fun resizeAndPad(img: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        // Resize the image to fit within the target dimensions, maintaining aspect ratio.
+        val originalWidth = img.width
+        val originalHeight = img.height
+        val aspectRatio = originalWidth.toFloat() / originalHeight.toFloat()
+        val newWidth: Int
+        val newHeight: Int
+        if (originalWidth > originalHeight) {
+            newWidth = targetWidth
+            newHeight = Math.round(targetWidth / aspectRatio)
+        } else {
+            newHeight = targetHeight
+            newWidth = Math.round(targetHeight * aspectRatio)
+        }
+        val resizedImg = Bitmap.createScaledBitmap(img, newWidth, newHeight, true)
+
+        // Create a new bitmap with target dimensions and draw the resized image onto it, centered.
+        val paddedImg = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(paddedImg)
+        canvas.drawARGB(0, 0, 0, 0) // Optional: fill with transparent color
+        canvas.drawBitmap(resizedImg, (targetWidth - newWidth) / 2f, (targetHeight - newHeight) / 2f, null)
+
+        return paddedImg
+    }
 
 
 //    private var endGameListener: EndGameListener? = null
@@ -109,6 +138,7 @@ class CameraSource(
             score = 0.321075f
         )
     )
+private var processed =false;
 
     private val lock = Any()
     private var detector: PoseDetector? = null
@@ -188,6 +218,13 @@ class CameraSource(
         }
         // Take photo after 1 seconds delay
         //takePhotoAfterDelay(1000)
+        if(processed==false){
+                     //ml?
+
+
+            //processImage(baseimage)
+            processed =true
+        }
     }
 
     private suspend fun createSession(targets: List<Surface>): CameraCaptureSession =

@@ -24,6 +24,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.Process
+import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
@@ -64,7 +65,8 @@ class MainActivity : AppCompatActivity() {
 
     /** Default device is CPU */
     private var device = Device.CPU
-
+//
+    private var url:String?=null
     //private var previewBitmap: Bitmap? = null//new
     private lateinit var tvScore: TextView
     private lateinit var tvFPS: TextView
@@ -143,6 +145,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        //
+        val intent1 = intent
+        if (intent1 != null && intent1.hasExtra("url")) {
+            url =
+                intent1.getStringExtra("url") // default value in case "id" is not found
+            // Use the ID as needed
+        } else {
+            // Handle the case when "id" is not passed
+            Log.e("the game", "No URL passed in the intent")
+        }
+
+
         // keep screen on while app is running
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tvScore = findViewById(R.id.tvScore)
@@ -158,6 +172,9 @@ class MainActivity : AppCompatActivity() {
         swClassification = findViewById(R.id.swPoseClassification)
         vClassificationOption = findViewById(R.id.vClassificationOption)
 
+
+
+
         initSpinner()
         spnModel.setSelection(modelPos)
         swClassification.setOnCheckedChangeListener(setClassificationListener)
@@ -167,6 +184,11 @@ class MainActivity : AppCompatActivity() {
         val button = findViewById<Button>(R.id.button)
         button.setOnClickListener {
             val intent = Intent(this@MainActivity, ShowResult::class.java)
+            startActivity(intent)
+        }
+        val button2 = findViewById<Button>(R.id.button2)
+        button2.setOnClickListener {
+            val intent = Intent(this@MainActivity, GameList::class.java)
             startActivity(intent)
         }
 
@@ -207,58 +229,61 @@ class MainActivity : AppCompatActivity() {
         if (isCameraPermissionGranted()) {
             if (cameraSource == null) {
                 cameraSource =
-                    CameraSource(surfaceView, object : CameraSource.CameraSourceListener {
-                        override fun onFPSListener(fps: Int) {
-                            tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
-                        }
-
-                        override fun onDetectedInfo(
-                            personScore: Float?,
-                            poseLabels: List<Pair<String, Float>>?
-                        ) {
-                            tvScore.text = getString(R.string.tfe_pe_tv_score, personScore ?: 0f)
-                            poseLabels?.sortedByDescending { it.second }?.let {
-                                tvClassificationValue1.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.isNotEmpty()) it[0] else null)
-                                )
-                                tvClassificationValue2.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.size >= 2) it[1] else null)
-                                )
-                                tvClassificationValue3.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.size >= 3) it[2] else null)
-                                )
+                    url?.let {
+                        CameraSource(it,surfaceView, object : CameraSource.CameraSourceListener {
+                            override fun onFPSListener(fps: Int) {
+                                tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
                             }
-                        }//new
-                        override fun onClose(boolean: Boolean) {
-                            if (showResult == null) {
-                                (this as Activity).runOnUiThread {
-                                    val intent: Intent = Intent(this, ShowResult::class.java)
-                                    // Set any extras or flags if needed
-                                    //intent.putExtra("imagename", fileName)
-                                    //intent.putExtra("url", url)
-                                    this.startActivity(intent)
+
+                            override fun onDetectedInfo(
+                                personScore: Float?,
+                                poseLabels: List<Pair<String, Float>>?
+                            ) {
+                                tvScore.text = getString(R.string.tfe_pe_tv_score, personScore ?: 0f)
+                                poseLabels?.sortedByDescending { it.second }?.let {
+                                    tvClassificationValue1.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.isNotEmpty()) it[0] else null)
+                                    )
+                                    tvClassificationValue2.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.size >= 2) it[1] else null)
+                                    )
+                                    tvClassificationValue3.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.size >= 3) it[2] else null)
+                                    )
                                 }
-                                //showResult = ShowResult()
+                            }//new
+
+                            override fun onClose(boolean: Boolean) {
+                                if (showResult == null) {
+                                    (this as Activity).runOnUiThread {
+                                        val intent: Intent = Intent(this, ShowResult::class.java)
+                                        // Set any extras or flags if needed
+                                        //intent.putExtra("imagename", fileName)
+                                        //intent.putExtra("url", url)
+                                        this.startActivity(intent)
+                                    }
+                                    //showResult = ShowResult()
 
 
-                                //isPoseClassifier()//not needed me
-//                                lifecycleScope.launch(Dispatchers.Main) {
-//                                    showResult?.initCamera()
-//                                }
+                                    //isPoseClassifier()//not needed me
+                //                                lifecycleScope.launch(Dispatchers.Main) {
+                //                                    showResult?.initCamera()
+                //                                }
+                                }
+
                             }
-
-                        }
 
 
                             //Log.d(TAG, "Preview frame received")
                             //previewBitmap = bitmap
-                        //}
+                            //}
 
-                    }).apply {
-                        prepareCamera()
+                        }).apply {
+                            prepareCamera()
+                        }
                     }
 //                cameraSource!!.setEndGameListener(object : CameraSource.EndGameListener {
 //                        override fun onEndGame() {

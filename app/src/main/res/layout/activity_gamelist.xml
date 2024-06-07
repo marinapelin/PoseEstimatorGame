@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F9CBE8"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/rectangle1"
+        android:layout_width="360dp"
+        android:layout_height="630dp"
+        android:background="@drawable/rectangle1"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.509"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.495" />
+
+    <TextView
+        android:id="@+id/textview_first"
+        android:layout_width="300dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="90dp"
+        android:text="Choose the challenge"
+        android:textColor="@color/black"
+        android:textSize="19sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <TextView
+        android:id="@+id/tx_itemlist"
+        android:text=""
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginStart="1dp"
+        android:layout_marginTop="100dp"
+        android:layout_marginEnd="1dp"
+        android:layout_marginBottom="1dp"
+        app:layout_constraintBottom_toBottomOf="@id/rectangle1"
+        app:layout_constraintEnd_toEndOf="@id/rectangle1"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="@id/rectangle1"
+        app:layout_constraintTop_toTopOf="@id/rectangle1" />
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/OneGameLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintTop_toTopOf="@id/tx_itemlist"
+        app:layout_constraintLeft_toLeftOf="@id/tx_itemlist">
+
+        <ImageView
+            android:id="@+id/rectangle2"
+            android:layout_width="330dp"
+            android:layout_height="130dp"
+            android:layout_marginLeft="16dp"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/rectangle2"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/iv_GameItemPicture"
+            android:layout_width="120dp"
+            android:layout_height="130dp"
+            android:src="@drawable/photomenu"
+            app:layout_constraintLeft_toLeftOf="@id/rectangle2"
+            app:layout_constraintTop_toTopOf="@id/rectangle2" />
+
+        <TextView
+            android:id="@+id/tv_GameCategory"
+            android:layout_width="190dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:text="Standing pose"
+            android:textColor="#808080"
+            android:textSize="11sp"
+            app:layout_constraintStart_toEndOf="@id/iv_GameItemPicture"
+            app:layout_constraintTop_toTopOf="@id/iv_GameItemPicture" />
+
+        <TextView
+            android:id="@+id/tv_GameHeading"
+            android:layout_width="190dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="140dp"
+            android:layout_marginTop="30dp"
+            android:text="#1 Hands on Hips"
+            android:textColor="@color/black"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="@id/iv_GameItemPicture"
+            app:layout_constraintTop_toTopOf="@id/iv_GameItemPicture" />
+
+        <ImageView
+            android:id="@+id/icon1"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/icon1"
+            app:layout_constraintStart_toEndOf="@+id/iv_GameItemPicture"
+            app:layout_constraintTop_toBottomOf="@+id/tv_GameHeading" />
+
+        <TextView
+            android:id="@+id/tv_GameLevel"
+            android:layout_width="100dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:text="Beginner"
+            android:textColor="#808080"
+            android:textSize="12sp"
+            app:layout_constraintStart_toEndOf="@+id/icon1"
+            app:layout_constraintTop_toTopOf="@+id/icon1" />
+
+        <ImageView
+            android:id="@+id/icon2"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_marginStart="20dp"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/icon2"
+            app:layout_constraintStart_toEndOf="@+id/iv_GameItemPicture"
+            app:layout_constraintTop_toBottomOf="@+id/icon1" />
+
+        <TextView
+            android:id="@+id/tv_time"
+            android:layout_width="100dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:text="No limits"
+            android:textColor="#808080"
+            android:textSize="12sp"
+            app:layout_constraintStart_toEndOf="@+id/icon2"
+            app:layout_constraintTop_toBottomOf="@+id/tv_GameLevel" />
+
+        <ImageButton
+            android:id="@+id/buttonplaymenu"
+            android:layout_width="80dp"
+            android:layout_height="70dp"
+            android:layout_marginEnd="16dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/buttonplaymenu"
+            app:layout_constraintBottom_toBottomOf="@+id/rectangle2"
+            app:layout_constraintEnd_toEndOf="@+id/rectangle2" />
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+    <ImageButton
+        android:id="@+id/ib_profile"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintEnd_toEndOf="@+id/rectangle1"
+        app:layout_constraintTop_toTopOf="@+id/rectangle1"
+        app:srcCompat="@drawable/blueicon" />
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>
