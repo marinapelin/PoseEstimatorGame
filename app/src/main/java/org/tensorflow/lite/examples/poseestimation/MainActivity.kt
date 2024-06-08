@@ -22,6 +22,8 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Process
 import android.util.Log
@@ -36,6 +38,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
@@ -228,8 +233,9 @@ class MainActivity : AppCompatActivity() {
     private fun openCamera() {
         if (isCameraPermissionGranted()) {
             if (cameraSource == null) {
+                url?.let { stringToBitmap(it) }
                 cameraSource =
-                    url?.let {
+                    baseImgBitmap?.let {
                         CameraSource(it,surfaceView, object : CameraSource.CameraSourceListener {
                             override fun onFPSListener(fps: Int) {
                                 tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
@@ -265,37 +271,17 @@ class MainActivity : AppCompatActivity() {
                                         //intent.putExtra("url", url)
                                         this.startActivity(intent)
                                     }
-                                    //showResult = ShowResult()
 
-
-                                    //isPoseClassifier()//not needed me
-                //                                lifecycleScope.launch(Dispatchers.Main) {
-                //                                    showResult?.initCamera()
-                //                                }
                                 }
 
                             }
 
 
-                            //Log.d(TAG, "Preview frame received")
-                            //previewBitmap = bitmap
-                            //}
-
                         }).apply {
                             prepareCamera()
                         }
                     }
-//                cameraSource!!.setEndGameListener(object : CameraSource.EndGameListener {
-//                        override fun onEndGame() {
-//                            // Handle the EndGame state change
-//                            Log.d(TAG, "EndGame is true, handling state change in MainActivity")
-//                            showToast("END")
-//                            //sendBroadcast(intermediation);
-//
 
-//
-//                        }
-//                })
 
                 if (allPermissionsGranted()) {
                     //startCamera()
@@ -493,6 +479,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+    private var baseImgBitmap: Bitmap?=null
+    fun stringToBitmap(url:String){
+
+        Glide.with(this)
+            .asBitmap()
+            .load(url)
+            .into(object : CustomTarget<Bitmap>() {
+                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                    baseImgBitmap=resource
+                }
+
+                override fun onLoadCleared(placeholder: Drawable?) {
+                    // Handle placeholder if needed
+                }
+
+                override fun onLoadFailed(errorDrawable: Drawable?) {
+                    // Handle the error case
+                }
+            })
+
     }
 
     /**

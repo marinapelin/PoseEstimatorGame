@@ -24,6 +24,7 @@ import android.graphics.ImageFormat
 import android.graphics.Matrix
 import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
@@ -39,7 +40,9 @@ import android.view.Surface
 import android.view.SurfaceView
 import android.widget.Toast
 import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.target.SimpleTarget
+import com.bumptech.glide.request.transition.Transition
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
@@ -60,17 +63,14 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class CameraSource(
-    private val url: String ="https://content1.getnarrativeapp.com/static/8542a067-76df-49d2-b3c6-b347d6da1b85/Sam_0205.jpg?w=750",
+    private val baseImageBitmap:Bitmap,
     private val surfaceView: SurfaceView,
     private val listener: CameraSourceListener? = null
 ) {
     var test: List<Pair<String, Float>>? =null
         public var EndGame: Boolean = false
         private set
-//    interface EndGameListener {
-//
-//        fun OnEndGame()
-//    }
+
 
     fun resizeAndPad(img: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
         // Resize the image to fit within the target dimensions, maintaining aspect ratio.
@@ -112,32 +112,7 @@ class CameraSource(
         private const val TAG = "Camera Source"
     }
 
-    private var thePersons: List<Person> = listOf(
-        Person(
-            id = -1,
-            keyPoints = listOf(
-                KeyPoint(bodyPart = BodyPart.NOSE, coordinate = PointF(262.3125f, 262.5078f), score = 0.61399585f),
-                KeyPoint(bodyPart = BodyPart.LEFT_EYE, coordinate = PointF(294.6723f, 233.80849f), score = 0.47138926f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_EYE, coordinate = PointF(252.67532f, 237.27197f), score = 0.5418733f),
-                KeyPoint(bodyPart = BodyPart.LEFT_EAR, coordinate = PointF(373.3912f, 254.24982f), score = 0.48233688f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_EAR, coordinate = PointF(255.02353f, 251.37383f), score = 0.24887112f),
-                KeyPoint(bodyPart = BodyPart.LEFT_SHOULDER, coordinate = PointF(428.4883f, 425.24216f), score = 0.62777394f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_SHOULDER, coordinate = PointF(220.79736f, 387.03735f), score = 0.7529446f),
-                KeyPoint(bodyPart = BodyPart.LEFT_ELBOW, coordinate = PointF(416.0971f, 625.88104f), score = 0.31619754f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_ELBOW, coordinate = PointF(124.45984f, 512.50476f), score = 0.4252016f),
-                KeyPoint(bodyPart = BodyPart.LEFT_WRIST, coordinate = PointF(287.91705f, 606.51953f), score = 0.09692693f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_WRIST, coordinate = PointF(107.27205f, 626.70416f), score = 0.26168692f),
-                KeyPoint(bodyPart = BodyPart.LEFT_HIP, coordinate = PointF(324.33444f, 638.16925f), score = 0.2071212f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_HIP, coordinate = PointF(201.19821f, 638.6145f), score = 0.26187536f),
-                KeyPoint(bodyPart = BodyPart.LEFT_KNEE, coordinate = PointF(384.43634f, 641.734f), score = 0.034328014f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_KNEE, coordinate = PointF(70.66431f, 642.3127f), score = 0.04376632f),
-                KeyPoint(bodyPart = BodyPart.LEFT_ANKLE, coordinate = PointF(206.36691f, 637.9958f), score = 0.037734658f),
-                KeyPoint(bodyPart = BodyPart.RIGHT_ANKLE, coordinate = PointF(76.84413f, 635.8355f), score = 0.03425151f)
-            ),
-            boundingBox = null,
-            score = 0.321075f
-        )
-    )
+    private var thePersons: List<Person> ?=null
 private var processed =false;
 
     private val lock = Any()
@@ -218,13 +193,15 @@ private var processed =false;
         }
         // Take photo after 1 seconds delay
         //takePhotoAfterDelay(1000)
-        if(processed==false){
-                     //ml?
+
+            if (baseImageBitmap != null) {
+                           // Bitmap.Config.ARGB_8888
+               processBaseImage(baseImageBitmap)
 
 
-            //processImage(baseimage)
-            processed =true
-        }
+            }
+
+
     }
 
     private suspend fun createSession(targets: List<Surface>): CameraCaptureSession =
@@ -367,19 +344,51 @@ private var processed =false;
         }
         visualize(persons, bitmap)
     }
+    // process baseimage
+    private fun processBaseImage(bitmap: Bitmap) {
+        val basePersons=mutableListOf<Person>()
+        //val resizedBitmap=resizeAndPad(bitmap,bitmap.width,bitmap.height)
+        //var classificationResult: List<Pair<String, Float>>? = null
+
+        synchronized(lock) {
+            detector?.estimatePoses(bitmap)?.let {
+                basePersons.addAll(it)
+
+                // if the model only returns one item, allow running the Pose classifier.
+//                if (basePersons.isNotEmpty()) {
+//                    classifier?.run {
+//                        classificationResult = classify(persons[0])
+//                        test =classificationResult
+//                    }
+//                }
+            }
+        }
+//        frameProcessedInOneSecondInterval++
+//        if (frameProcessedInOneSecondInterval == 1) {
+//            // send fps to view
+//            listener?.onFPSListener(framesPerSecond)
+//        }
+
+        // if the model returns only one item, show that item's score.
+//        if (persons.isNotEmpty()) {
+//            listener?.onDetectedInfo(persons[0].score, classificationResult)
+//        }
+
+        thePersons=basePersons
+    }
 
     private fun visualize(persons: List<Person>, bitmap: Bitmap) {
 
-        val outputBitmap = VisualizationUtils.drawBodyKeypoints(
-            bitmap,
-            persons.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
-        )
+        val outputBitmap = thePersons?.let {
+            VisualizationUtils.drawBodyKeypoints(
+                bitmap,
+                it.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
+            )
+        }
         val threshold = 50.0f // Adjust this threshold as needed
         val comparer = KeyPointComparer()
-        val result = comparer.areListPersonsSimilar(thePersons, persons, threshold)
-        //Toast.makeText(surfaceView.context, "Result: $result", Toast.LENGTH_LONG).show()
+        val result = thePersons?.let { comparer.areListPersonsSimilar(it, persons, threshold) }
 
-        //println("Are persons similar: $result")
          if(result==true){
              Toast.makeText(surfaceView.context, "Result: $result", Toast.LENGTH_LONG).show()
              //takePhotoAfterDelay(10)
@@ -395,26 +404,27 @@ private var processed =false;
             val left: Int
             val top: Int
 
-            if (canvas.height > canvas.width) {
-                val ratio = outputBitmap.height.toFloat() / outputBitmap.width
-                screenWidth = canvas.width
-                left = 0
-                screenHeight = (canvas.width * ratio).toInt()
-                top = (canvas.height - screenHeight) / 2
-            } else {
-                val ratio = outputBitmap.width.toFloat() / outputBitmap.height
-                screenHeight = canvas.height
-                top = 0
-                screenWidth = (canvas.height * ratio).toInt()
-                left = (canvas.width - screenWidth) / 2
+            if(outputBitmap!=null){
+                if (canvas.height > canvas.width) {
+                    val ratio = outputBitmap.height.toFloat() / outputBitmap.width
+                    screenWidth = canvas.width
+                    left = 0
+                    screenHeight = (canvas.width * ratio).toInt()
+                    top = (canvas.height - screenHeight) / 2
+                } else {
+                    val ratio = outputBitmap.width.toFloat() / outputBitmap.height
+                    screenHeight = canvas.height
+                    top = 0
+                    screenWidth = (canvas.height * ratio).toInt()
+                    left = (canvas.width - screenWidth) / 2
+                }
+                val right: Int = left + screenWidth
+                val bottom: Int = top + screenHeight
+                canvas.drawBitmap(
+                    outputBitmap, Rect(0, 0, outputBitmap.width, outputBitmap.height),
+                    Rect(left, top, right, bottom), null
+                )
             }
-            val right: Int = left + screenWidth
-            val bottom: Int = top + screenHeight
-
-            canvas.drawBitmap(
-                outputBitmap, Rect(0, 0, outputBitmap.width, outputBitmap.height),
-                Rect(left, top, right, bottom), null
-            )
             surfaceView.holder.unlockCanvasAndPost(canvas)
         }
     }
