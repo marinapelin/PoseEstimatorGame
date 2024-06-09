@@ -19,36 +19,90 @@ package org.tensorflow.lite.examples.poseestimation.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.ImageFormat
 import android.graphics.Matrix
+import android.graphics.PointF
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.TotalCaptureResult
 import android.media.ImageReader
+import android.os.Environment
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
 import android.view.SurfaceView
+import android.widget.Toast
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.target.SimpleTarget
+import com.bumptech.glide.request.transition.Transition
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.tensorflow.lite.examples.poseestimation.VisualizationUtils
 import org.tensorflow.lite.examples.poseestimation.YuvToRgbConverter
+import org.tensorflow.lite.examples.poseestimation.data.BodyPart
+import org.tensorflow.lite.examples.poseestimation.data.KeyPoint
+import org.tensorflow.lite.examples.poseestimation.data.KeyPointComparer
 import org.tensorflow.lite.examples.poseestimation.data.Person
 import org.tensorflow.lite.examples.poseestimation.ml.MoveNetMultiPose
 import org.tensorflow.lite.examples.poseestimation.ml.PoseClassifier
 import org.tensorflow.lite.examples.poseestimation.ml.PoseDetector
 import org.tensorflow.lite.examples.poseestimation.ml.TrackerType
+import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
+import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
 import java.util.*
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 class CameraSource(
+    private val baseImageBitmap:Bitmap,
     private val surfaceView: SurfaceView,
     private val listener: CameraSourceListener? = null
 ) {
+    var test: List<Pair<String, Float>>? =null
+        public var EndGame: Boolean = false
+        private set
 
+
+    fun resizeAndPad(img: Bitmap, targetWidth: Int, targetHeight: Int): Bitmap {
+        // Resize the image to fit within the target dimensions, maintaining aspect ratio.
+        val originalWidth = img.width
+        val originalHeight = img.height
+        val aspectRatio = originalWidth.toFloat() / originalHeight.toFloat()
+        val newWidth: Int
+        val newHeight: Int
+        if (originalWidth > originalHeight) {
+            newWidth = targetWidth
+            newHeight = Math.round(targetWidth / aspectRatio)
+        } else {
+            newHeight = targetHeight
+            newWidth = Math.round(targetHeight * aspectRatio)
+        }
+        val resizedImg = Bitmap.createScaledBitmap(img, newWidth, newHeight, true)
+
+        // Create a new bitmap with target dimensions and draw the resized image onto it, centered.
+        val paddedImg = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(paddedImg)
+        canvas.drawARGB(0, 0, 0, 0) // Optional: fill with transparent color
+        canvas.drawBitmap(resizedImg, (targetWidth - newWidth) / 2f, (targetHeight - newHeight) / 2f, null)
+
+        return paddedImg
+    }
+
+
+//    private var endGameListener: EndGameListener? = null
+//
+//    fun setEndGameListener(listener: EndGameListener) {
+//        endGameListener = listener
+//    }
     companion object {
         private const val PREVIEW_WIDTH = 640
         private const val PREVIEW_HEIGHT = 480
@@ -58,12 +112,15 @@ class CameraSource(
         private const val TAG = "Camera Source"
     }
 
+    private var thePersons: List<Person> ?=null
+private var processed =false;
+
     private val lock = Any()
     private var detector: PoseDetector? = null
     private var classifier: PoseClassifier? = null
     private var isTrackerEnabled = false
     private var yuvConverter: YuvToRgbConverter = YuvToRgbConverter(surfaceView.context)
-    private lateinit var imageBitmap: Bitmap
+    public lateinit var imageBitmap: Bitmap
 
     /** Frame count that have been processed so far in an one second interval to calculate FPS. */
     private var fpsTimer: Timer? = null
@@ -110,7 +167,9 @@ class CameraSource(
                 yuvConverter.yuvToRgb(image, imageBitmap)
                 // Create rotated version for portrait display
                 val rotateMatrix = Matrix()
-                rotateMatrix.postRotate(90.0f)
+                rotateMatrix.postRotate(-90.0f) //90.0f if we are facing front
+                // Mirror the image
+                rotateMatrix.postScale(-1f, 1f, PREVIEW_WIDTH / 2f, PREVIEW_HEIGHT / 2f)
 
                 val rotatedBitmap = Bitmap.createBitmap(
                     imageBitmap, 0, 0, PREVIEW_WIDTH, PREVIEW_HEIGHT,
@@ -132,6 +191,17 @@ class CameraSource(
                 session?.setRepeatingRequest(it, null, null)
             }
         }
+        // Take photo after 1 seconds delay
+        //takePhotoAfterDelay(1000)
+
+            if (baseImageBitmap != null) {
+                           // Bitmap.Config.ARGB_8888
+               processBaseImage(baseImageBitmap)
+
+
+            }
+
+
     }
 
     private suspend fun createSession(targets: List<Surface>): CameraCaptureSession =
@@ -167,15 +237,20 @@ class CameraSource(
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
 
             // We don't use a front facing camera in this sample.
+
             val cameraDirection = characteristics.get(CameraCharacteristics.LENS_FACING)//
             if (cameraDirection != null &&
-                cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
+                cameraDirection == CameraCharacteristics.LENS_FACING_BACK     //LENS_FACING_FRONT
             ) {
                 continue
             }
             this.cameraId = cameraId
+
+
+            break
         }
     }
+
 
     fun setDetector(detector: PoseDetector) {
         synchronized(lock) {
@@ -252,6 +327,7 @@ class CameraSource(
                 if (persons.isNotEmpty()) {
                     classifier?.run {
                         classificationResult = classify(persons[0])
+                        test =classificationResult
                     }
                 }
             }
@@ -268,13 +344,57 @@ class CameraSource(
         }
         visualize(persons, bitmap)
     }
+    // process baseimage
+    private fun processBaseImage(bitmap: Bitmap) {
+        val basePersons=mutableListOf<Person>()
+        //val resizedBitmap=resizeAndPad(bitmap,bitmap.width,bitmap.height)
+        //var classificationResult: List<Pair<String, Float>>? = null
+
+        synchronized(lock) {
+            detector?.estimatePoses(bitmap)?.let {
+                basePersons.addAll(it)
+
+                // if the model only returns one item, allow running the Pose classifier.
+//                if (basePersons.isNotEmpty()) {
+//                    classifier?.run {
+//                        classificationResult = classify(persons[0])
+//                        test =classificationResult
+//                    }
+//                }
+            }
+        }
+//        frameProcessedInOneSecondInterval++
+//        if (frameProcessedInOneSecondInterval == 1) {
+//            // send fps to view
+//            listener?.onFPSListener(framesPerSecond)
+//        }
+
+        // if the model returns only one item, show that item's score.
+//        if (persons.isNotEmpty()) {
+//            listener?.onDetectedInfo(persons[0].score, classificationResult)
+//        }
+
+        thePersons=basePersons
+    }
 
     private fun visualize(persons: List<Person>, bitmap: Bitmap) {
 
-        val outputBitmap = VisualizationUtils.drawBodyKeypoints(
-            bitmap,
-            persons.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
-        )
+        val outputBitmap = thePersons?.let {
+            VisualizationUtils.drawBodyKeypoints(
+                bitmap,
+                it.filter { it.score > MIN_CONFIDENCE }, isTrackerEnabled
+            )
+        }
+        val threshold = 50.0f // Adjust this threshold as needed
+        val comparer = KeyPointComparer()
+        val result = thePersons?.let { comparer.areListPersonsSimilar(it, persons, threshold) }
+
+         if(result==true){
+             Toast.makeText(surfaceView.context, "Result: $result", Toast.LENGTH_LONG).show()
+             //takePhotoAfterDelay(10)
+             saveImage(bitmap)
+         }
+
 
         val holder = surfaceView.holder
         val surfaceCanvas = holder.lockCanvas()
@@ -284,26 +404,27 @@ class CameraSource(
             val left: Int
             val top: Int
 
-            if (canvas.height > canvas.width) {
-                val ratio = outputBitmap.height.toFloat() / outputBitmap.width
-                screenWidth = canvas.width
-                left = 0
-                screenHeight = (canvas.width * ratio).toInt()
-                top = (canvas.height - screenHeight) / 2
-            } else {
-                val ratio = outputBitmap.width.toFloat() / outputBitmap.height
-                screenHeight = canvas.height
-                top = 0
-                screenWidth = (canvas.height * ratio).toInt()
-                left = (canvas.width - screenWidth) / 2
+            if(outputBitmap!=null){
+                if (canvas.height > canvas.width) {
+                    val ratio = outputBitmap.height.toFloat() / outputBitmap.width
+                    screenWidth = canvas.width
+                    left = 0
+                    screenHeight = (canvas.width * ratio).toInt()
+                    top = (canvas.height - screenHeight) / 2
+                } else {
+                    val ratio = outputBitmap.width.toFloat() / outputBitmap.height
+                    screenHeight = canvas.height
+                    top = 0
+                    screenWidth = (canvas.height * ratio).toInt()
+                    left = (canvas.width - screenWidth) / 2
+                }
+                val right: Int = left + screenWidth
+                val bottom: Int = top + screenHeight
+                canvas.drawBitmap(
+                    outputBitmap, Rect(0, 0, outputBitmap.width, outputBitmap.height),
+                    Rect(left, top, right, bottom), null
+                )
             }
-            val right: Int = left + screenWidth
-            val bottom: Int = top + screenHeight
-
-            canvas.drawBitmap(
-                outputBitmap, Rect(0, 0, outputBitmap.width, outputBitmap.height),
-                Rect(left, top, right, bottom), null
-            )
             surfaceView.holder.unlockCanvasAndPost(canvas)
         }
     }
@@ -321,7 +442,64 @@ class CameraSource(
 
     interface CameraSourceListener {
         fun onFPSListener(fps: Int)
-
         fun onDetectedInfo(personScore: Float?, poseLabels: List<Pair<String, Float>>?)
+        fun onClose(boolean: Boolean)
     }
+    //new
+    private fun capturePhoto() {
+        val captureRequest = camera?.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
+        imageReader?.surface?.let {
+            captureRequest?.addTarget(it)
+            captureRequest?.build()?.let { it1 ->
+                session?.capture(it1, object : CameraCaptureSession.CaptureCallback() {
+                    override fun onCaptureCompleted(
+                        session: CameraCaptureSession,
+                        request: CaptureRequest,
+                        result: TotalCaptureResult
+                    ) {
+                        super.onCaptureCompleted(session, request, result)
+                        Toast.makeText(surfaceView.context, "Photo captured", Toast.LENGTH_SHORT).show()
+                        saveImage(imageBitmap)//i think
+                    }
+                }, imageReaderHandler)
+            }
+        }
+    }
+    fun saveImage(imageBitmap: Bitmap) {
+        val root = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString()
+        val myDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "AppPictures")
+        myDir.mkdirs()
+        val fileName = "Image_${System.currentTimeMillis()}.jpg"
+        val file = File(myDir, fileName)
+        if (file.exists()) file.delete()
+        try {
+            val out = FileOutputStream(file)
+            imageBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            out.flush()
+            out.close()
+            Toast.makeText(surfaceView.context, "Saved: $file", Toast.LENGTH_LONG).show()
+            EndGame = true;
+            //callback.onCameraReady()
+            //stopImageReaderThread()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            Toast.makeText(surfaceView.context, "Error saving image", Toast.LENGTH_SHORT).show()
+        }
+       // close()
+
+        //listener?.onDetectedInfo(21123.2f, test)
+        //listener?.onClose(true)
+        //onClose()
+
+    }
+
+    private fun takePhotoAfterDelay(delayMillis: Long) {
+        imageReaderHandler?.postDelayed({
+            capturePhoto()
+        }, delayMillis)
+    }
+
+    //end new
+
 }

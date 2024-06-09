@@ -1,4 +1,4 @@
-/* Copyright 2021 The TensorFlow Authors. All Rights Reserved.
+/* Copyright 2021 The Te nsorFlow Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,16 @@ limitations under the License.
 package org.tensorflow.lite.examples.poseestimation
 
 import android.Manifest
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.os.Process
+import android.util.Log
 import android.view.SurfaceView
 import android.view.View
 import android.view.WindowManager
@@ -29,20 +34,29 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.DialogFragment
 import androidx.lifecycle.lifecycleScope
+import com.bumptech.glide.Glide
+import com.bumptech.glide.request.target.CustomTarget
+import com.bumptech.glide.request.transition.Transition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.tensorflow.lite.examples.poseestimation.camera.CameraSource
 import org.tensorflow.lite.examples.poseestimation.data.Device
+import org.tensorflow.lite.examples.poseestimation.data.ShowResult
 import org.tensorflow.lite.examples.poseestimation.ml.*
+
+
+//import kotlin.coroutines.jvm.internal.CompletedContinuation.context
 
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val FRAGMENT_DIALOG = "dialog"
+    //new
+        private const val REQUEST_CAMERA_PERMISSION = 100
     }
-
     /** A [SurfaceView] for camera preview.   */
     private lateinit var surfaceView: SurfaceView
 
@@ -56,7 +70,9 @@ class MainActivity : AppCompatActivity() {
 
     /** Default device is CPU */
     private var device = Device.CPU
-
+//
+    private var url:String?=null
+    //private var previewBitmap: Bitmap? = null//new
     private lateinit var tvScore: TextView
     private lateinit var tvFPS: TextView
     private lateinit var spnDevice: Spinner
@@ -69,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var swClassification: SwitchCompat
     private lateinit var vClassificationOption: View
     private var cameraSource: CameraSource? = null
+    private var showResult: ShowResult? = null
     private var isClassifyPose = false
     private val requestPermissionLauncher =
         registerForActivityResult(
@@ -133,6 +150,18 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        //
+        val intent1 = intent
+        if (intent1 != null && intent1.hasExtra("url")) {
+            url =
+                intent1.getStringExtra("url") // default value in case "id" is not found
+            // Use the ID as needed
+        } else {
+            // Handle the case when "id" is not passed
+            Log.e("the game", "No URL passed in the intent")
+        }
+
+
         // keep screen on while app is running
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         tvScore = findViewById(R.id.tvScore)
@@ -147,11 +176,31 @@ class MainActivity : AppCompatActivity() {
         tvClassificationValue3 = findViewById(R.id.tvClassificationValue3)
         swClassification = findViewById(R.id.swPoseClassification)
         vClassificationOption = findViewById(R.id.vClassificationOption)
+
+
+
+
         initSpinner()
         spnModel.setSelection(modelPos)
         swClassification.setOnCheckedChangeListener(setClassificationListener)
         if (!isCameraPermissionGranted()) {
             requestPermission()
+        }
+        val button = findViewById<Button>(R.id.button)
+        button.setOnClickListener {
+            val intent = Intent(this@MainActivity, ShowResult::class.java)
+            startActivity(intent)
+        }
+        val button2 = findViewById<Button>(R.id.button2)
+        button2.setOnClickListener {
+            val intent = Intent(this@MainActivity, GameList::class.java)
+            startActivity(intent)
+        }
+
+    }
+    private fun allPermissionsGranted(): Boolean {
+        return arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE).all {
+            ActivityCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
         }
     }
 
@@ -184,37 +233,66 @@ class MainActivity : AppCompatActivity() {
     private fun openCamera() {
         if (isCameraPermissionGranted()) {
             if (cameraSource == null) {
+                url?.let { stringToBitmap(it) }
                 cameraSource =
-                    CameraSource(surfaceView, object : CameraSource.CameraSourceListener {
-                        override fun onFPSListener(fps: Int) {
-                            tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
-                        }
-
-                        override fun onDetectedInfo(
-                            personScore: Float?,
-                            poseLabels: List<Pair<String, Float>>?
-                        ) {
-                            tvScore.text = getString(R.string.tfe_pe_tv_score, personScore ?: 0f)
-                            poseLabels?.sortedByDescending { it.second }?.let {
-                                tvClassificationValue1.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.isNotEmpty()) it[0] else null)
-                                )
-                                tvClassificationValue2.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.size >= 2) it[1] else null)
-                                )
-                                tvClassificationValue3.text = getString(
-                                    R.string.tfe_pe_tv_classification_value,
-                                    convertPoseLabels(if (it.size >= 3) it[2] else null)
-                                )
+                    baseImgBitmap?.let {
+                        CameraSource(it,surfaceView, object : CameraSource.CameraSourceListener {
+                            override fun onFPSListener(fps: Int) {
+                                tvFPS.text = getString(R.string.tfe_pe_tv_fps, fps)
                             }
-                        }
 
-                    }).apply {
-                        prepareCamera()
+                            override fun onDetectedInfo(
+                                personScore: Float?,
+                                poseLabels: List<Pair<String, Float>>?
+                            ) {
+                                tvScore.text = getString(R.string.tfe_pe_tv_score, personScore ?: 0f)
+                                poseLabels?.sortedByDescending { it.second }?.let {
+                                    tvClassificationValue1.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.isNotEmpty()) it[0] else null)
+                                    )
+                                    tvClassificationValue2.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.size >= 2) it[1] else null)
+                                    )
+                                    tvClassificationValue3.text = getString(
+                                        R.string.tfe_pe_tv_classification_value,
+                                        convertPoseLabels(if (it.size >= 3) it[2] else null)
+                                    )
+                                }
+                            }//new
+
+                            override fun onClose(boolean: Boolean) {
+                                if (showResult == null) {
+                                    (this as Activity).runOnUiThread {
+                                        val intent: Intent = Intent(this, ShowResult::class.java)
+                                        // Set any extras or flags if needed
+                                        //intent.putExtra("imagename", fileName)
+                                        //intent.putExtra("url", url)
+                                        this.startActivity(intent)
+                                    }
+
+                                }
+
+                            }
+
+
+                        }).apply {
+                            prepareCamera()
+                        }
                     }
-                isPoseClassifier()
+
+
+                if (allPermissionsGranted()) {
+                    //startCamera()
+                } else {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                        REQUEST_CAMERA_PERMISSION
+                    )
+                }
+                //isPoseClassifier()//not needed me
                 lifecycleScope.launch(Dispatchers.Main) {
                     cameraSource?.initCamera()
                 }
@@ -401,6 +479,27 @@ class MainActivity : AppCompatActivity() {
 
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+    private var baseImgBitmap: Bitmap?=null
+    fun stringToBitmap(url:String){
+
+        Glide.with(this)
+            .asBitmap()
+            .load(url)
+            .into(object : CustomTarget<Bitmap>() {
+                override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
+                    baseImgBitmap=resource
+                }
+
+                override fun onLoadCleared(placeholder: Drawable?) {
+                    // Handle placeholder if needed
+                }
+
+                override fun onLoadFailed(errorDrawable: Drawable?) {
+                    // Handle the error case
+                }
+            })
+
     }
 
     /**
